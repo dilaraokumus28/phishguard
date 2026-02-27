@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard – Erkenne Phishing-Mails</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Clash+Display:wght@500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* globale css-variablen (farben, schriften, abstände) */
+  :root {
+    --bg: #080c14;
+    --surface: #0f1623;
+    --surface2: #151e2e;
+    --surface3: #1c2840;
+    --border: #1f2f4a;
+    --border2: #243352;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --danger: #f43f5e;
+    --safe: #34d399;
+    --warn: #fbbf24;
+    --text: #e1e8f5;
+    --muted: #4d6080;
+    --muted2: #6b80a0;
+    --font-mono: 'Fira Code', monospace;
+    --font-display: 'Outfit', sans-serif;
+    --radius: 10px;
+  }
+  /* reset */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* grundlayout */
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* hintergrund-glow effekt */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% -10%, rgba(56,189,248,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 110%, rgba(129,140,248,0.07) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* einfaches gitter-muster über dem hintergrund */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(56,189,248,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,189,248,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* basis screen-klasse */
+  .screen { position: relative; z-index: 1; }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+
+  /* startseite */
+  #start-screen {
+    text-align: center;
+    gap: 1.8rem;
+  }
+  /* logo & badge */
+  .logo-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 100px;
+    padding: 0.3rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 9vw, 5.5rem);
+    font-weight: 800;
+    letter-spacing: -3px;
+    line-height: 1;
+    background: linear-gradient(135deg, #e0f2fe 0%, var(--accent) 40%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: glow 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from { filter: drop-shadow(0 0 30px rgba(56,189,248,0.25)); }
+    to   { filter: drop-shadow(0 0 50px rgba(129,140,248,0.4)); }
+  }
+
+  .tagline {
+    font-size: 0.85rem;
+    color: var(--muted2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  /* @Dilara schau mal hier */
+  .name-input-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .name-input-wrap label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  /* eingabefeld */
+  input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    padding: 0.85rem 1.2rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(56,189,248,0.1);
+  }
+  /* buttons allgemein */
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 0.85rem 2.5rem;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px rgba(56,189,248,0.12);
+    transform: translateY(-1px);
+  }
+  /* button-varianten */
+  .btn-danger { border-color: rgba(244,63,94,0.4); color: var(--danger); background: rgba(244,63,94,0.06); }
+  .btn-danger:hover { border-color: var(--danger); box-shadow: 0 0 20px rgba(244,63,94,0.2); transform: translateY(-1px); }
+
+  .btn-safe { border-color: rgba(52,211,153,0.4); color: var(--safe); background: rgba(52,211,153,0.06); }
+  .btn-safe:hover { border-color: var(--safe); box-shadow: 0 0 20px rgba(52,211,153,0.2); transform: translateY(-1px); }
+
+  /* leaderboard / bestenliste */
+  .lb-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .lb-preview h3 {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  .lb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank { color: var(--muted); width: 2rem; font-family: var(--font-mono); font-size: 0.75rem; }
+  .lb-name { flex: 1; font-weight: 500; }
+  .lb-score { color: var(--accent); font-weight: 700; font-family: var(--font-mono); }
+
+  /* gamescreen / spielbereich */
+  #game-screen {
+    justify-content: flex-start;
+    padding: 1rem 2rem 2rem;
+    gap: 0.8rem;
+    align-items: stretch;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  /* kopfleiste im spiel */
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-shrink: 0;
+  }
+
+  .hud-item { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+  .hud-label { font-family: var(--font-mono); font-size: 0.6rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .hud-value { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
+  .hud-value.score { color: var(--accent); }
+  .hud-value.timer { color: var(--warn); }
+  .hud-value.progress { color: var(--text); font-size: 1rem; font-family: var(--font-mono); }
+
+  /* Time-bar / fortschrittsbalken für den timer */
+  .timer-bar-wrap {
+    width: 100%;
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .timer-bar {
+    height: 100%;
+    background: var(--safe);
+    border-radius: 2px;
+    transition: width 1s linear, background 0.5s;
+  }
+
+  /* die mail-karte in der mitte */
+  .mail-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-shadow: 0 4px 40px rgba(0,0,0,0.3);
+  }
+  /* mail-kopfzeile */
+  .mail-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .mail-header-label { color: var(--muted); font-family: var(--font-mono); font-size: 0.72rem; }
+  .mail-header-val { color: var(--text); font-family: var(--font-mono); font-size: 0.82rem; }
+  .mail-subject-line {
+    grid-column: 1 / -1;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+  }
+  /* mail-text */
+  .mail-body {
+    padding: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    line-height: 1.85;
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: #c8d6e8;
+  }
+
+  /* die zwei buttons unten */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    flex-shrink: 0;
+  }
+  /* button-größe im spielbereich */
+  .action-btn {
+    padding: 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+  }
+
+  /* popup nach jeder antwort */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8,12,20,0.88);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .overlay.active { display: flex; }
+  /* feedback-karte */
+  .feedback-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    max-width: 540px;
+    width: 100%;
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(40px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  /* feedback-kopf */
+  .feedback-header {
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .feedback-header.correct { background: rgba(52,211,153,0.08); border-bottom: 1px solid rgba(52,211,153,0.15); }
+  .feedback-header.wrong   { background: rgba(244,63,94,0.08);  border-bottom: 1px solid rgba(244,63,94,0.15); }
+
+  .feedback-icon { font-size: 1.8rem; }
+
+  .feedback-title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 800;
+  }
+
+  .feedback-title.correct { color: var(--safe); }
+  .feedback-title.wrong   { color: var(--danger); }
+
+  .feedback-pts {
+    margin-left: auto;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--accent);
+  }
+
+  .feedback-body { padding: 1.4rem 2rem; }
+
+  .feedback-body h4 {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted2);
+    margin-bottom: 0.9rem;
+  }
+  /* hinweisliste */
+  .clue-list { list-style: none; display: flex; flex-direction: column; gap: 0.65rem; }
+
+  .clue-item {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    font-size: 0.84rem;
+    line-height: 1.55;
+    color: #b0c4de;
+  }
+
+  .clue-icon { flex-shrink: 0; font-size: 0.95rem; margin-top: 0.05rem; }
+
+  .feedback-footer { padding: 1rem 2rem 1.5rem; display: flex; justify-content: flex-end; }
+
+  /* auswertung am ende */
+  #end-screen { text-align: center; gap: 1.5rem; }
+
+  /* punkteanzeige groß */
+  .end-score {
+    font-family: var(--font-display);
+    font-size: clamp(3.5rem, 13vw, 8rem);
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    filter: drop-shadow(0 0 50px rgba(56,189,248,0.35));
+  }
+
+  .end-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted2);
+  }
+
+  .end-grade {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--warn);
+  }
+  /* statistik-kacheln */
+  .end-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    max-width: 480px;
+    width: 100%;
+  }
+
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1rem;
+  }
+
+  .stat-val { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; }
+  .stat-label { font-family: var(--font-mono); font-size: 0.6rem; color: var(--muted2); letter-spacing: 2px; text-transform: uppercase; margin-top: 0.3rem; }
+
+  .lb-full {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .end-btns { display: flex; gap: 1rem; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Startseite -->
+<div id="start-screen" class="screen active">
+  <div class="logo-wrap">
+    <div class="logo-badge">🛡 Serious Game · IT-Security</div>
+    <div class="logo">PhishGuard</div>
+    <div class="tagline">Erkenne Phishing-Mails bevor es zu spät ist</div>
+  </div>
+
+  <div class="name-input-wrap">
+    <label for="player-name">Dein Name</label>
+    <input type="text" id="player-name" placeholder="Max Mustermann" maxlength="20" />
+    <button class="btn" onclick="spielStarten()">▶ Spiel starten</button>
+  </div>
+
+  <div class="lb-preview">
+    <h3>🏆 Highscores</h3>
+    <div id="lb-start"></div>
+  </div>
+</div>
+
+<!-- Spielbereich -->
+<div id="game-screen" class="screen">
+  <div class="hud">
+    <div class="hud-item">
+      <span class="hud-label">Punkte</span>
+      <span class="hud-value score" id="hud-score">0</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Mail</span>
+      <span class="hud-value progress" id="hud-progress">1 / 8</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Timer</span>
+      <span class="hud-value timer" id="hud-timer">30</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Richtig</span>
+      <span class="hud-value" id="hud-correct" style="color:var(--safe)">0</span>
+    </div>
+  </div>
+
+  <div class="timer-bar-wrap">
+    <div class="timer-bar" id="timer-bar"></div>
+  </div>
+
+  <div class="mail-card">
+    <div class="mail-header">
+      <span class="mail-header-label">Von:</span>
+      <span class="mail-header-val" id="mail-from"></span>
+      <span class="mail-header-label">An:</span>
+      <span class="mail-header-val" id="mail-to">du@beispiel.de</span>
+      <div class="mail-subject-line" id="mail-subject"></div>
+    </div>
+    <div class="mail-body" id="mail-body"></div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-safe action-btn" onclick="antworten(false)">✅ Sieht echt aus</button>
+    <button class="btn btn-danger action-btn" onclick="antworten(true)">🎣 Phishing!</button>
+  </div>
+</div>
+
+<!-- Feedback-Popup -->
+<div class="overlay" id="feedback-overlay">
+  <div class="feedback-card">
+    <div class="feedback-header" id="fb-header">
+      <span class="feedback-icon" id="fb-icon"></span>
+      <span class="feedback-title" id="fb-title"></span>
+      <span class="feedback-pts" id="fb-pts"></span>
+    </div>
+    <div class="feedback-body">
+      <h4>Erklärung & Hinweise</h4>
+      <ul class="clue-list" id="fb-clues"></ul>
+    </div>
+    <div class="feedback-footer">
+      <button class="btn" onclick="naechsteMail()">Weiter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auswertung -->
+<div id="end-screen" class="screen">
+  <div class="end-label">Spiel beendet – dein Ergebnis</div>
+  <div class="end-score" id="end-score">0</div>
+  <div class="end-grade" id="end-grade"></div>
+
+  <div class="end-stats">
+    <div class="stat-box">
+      <div class="stat-val" id="stat-correct" style="color:var(--safe)">0</div>
+      <div class="stat-label">Richtig</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="stat-wrong" style="color:var(--danger)">0</div>
+      <div class="stat-label">Falsch</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="stat-time" style="color:var(--warn)">0</div>
+      <div class="stat-label">Ø Sekunden</div>
+    </div>
+  </div>
+
+  <div class="lb-full">
+    <div class="lb-preview">
+      <h3>🏆 Rangliste</h3>
+      <div id="lb-end"></div>
+    </div>
+  </div>
+
+  <div class="end-btns">
+    <button class="btn" onclick="neuStarten()">↺ Nochmal spielen</button>
+  </div>
+</div>
+
+<script>
+// alle mails mit ihren hinweisen
+const MAILS = [
+  {
+    isPhishing: true,
+    from: "support@paypa1-secure.com",
+    subject: "⚠️ Ihr Konto wurde gesperrt – sofort handeln!",
+    body: `Sehr geehrter Kunde,
+
+wir haben ungewöhnliche Aktivitäten auf Ihrem PayPal-Konto festgestellt.
+Um eine dauerhafte Sperrung zu vermeiden, müssen Sie Ihre Daten 
+INNERHALB VON 24 STUNDEN bestätigen.
+
+Klicken Sie jetzt auf den Link, um Ihr Konto zu entsperren:
+→ http://paypa1-verify.ru/konto/entsperren
+
+Falls Sie nicht innerhalb von 24 Stunden reagieren, wird Ihr
+Konto dauerhaft gesperrt und alle Guthaben eingefroren.
+
+Mit freundlichen Grüßen,
+PayPal Sicherheits-Team`,
+    clues: [
+      { icon: "🔴", text: "Absender-Domain: 'paypa1-secure.com' – die '1' statt 'l' ist ein klassisches Typosquatting" },
+      { icon: "🔴", text: "Drohung mit Konsequenzen ('dauerhaft gesperrt', '24 Stunden') erzeugt künstlichen Druck" },
+      { icon: "🔴", text: "Link zeigt auf '.ru'-Domain – hat nichts mit PayPal zu tun" },
+      { icon: "🟡", text: "Echte Banken & Payment-Dienste fragen niemals per E-Mail nach Login-Daten" }
+    ]
+  },
+  {
+    isPhishing: false,
+    from: "newsletter@spotify.com",
+    subject: "Deine Jahres-Zusammenfassung 2024 ist da!",
+    body: `Hey,
+
+dein Spotify Wrapped 2024 wartet auf dich! Schau dir an, welche Songs,
+Künstler und Podcasts dein Jahr 2024 geprägt haben.
+
+Du hast dieses Jahr über 3.200 Minuten Musik gehört. 🎵
+
+Öffne die Spotify-App oder besuche spotify.com/wrapped um deine
+persönliche Zusammenfassung zu sehen.
+
+Viel Spaß beim Stöbern!
+Das Spotify-Team
+
+––
+Du erhältst diese E-Mail, weil du spotify.com/newsletter-opt-in
+abonniert hast. Abmelden: spotify.com/account/notifications`,
+    clues: [
+      { icon: "🟢", text: "Absender-Domain '@spotify.com' – offizielle und korrekte Domain" },
+      { icon: "🟢", text: "Kein Druck, keine Drohungen – freundlicher, informativer Ton" },
+      { icon: "🟢", text: "Kein Link zu externen oder verdächtigen Seiten – Verweis nur auf spotify.com" },
+      { icon: "🟢", text: "Abmelde-Link vorhanden – seriöse Newsletter enthalten immer eine Abmeldeoption" }
+    ]
+  },
+  {
+    isPhishing: true,
+    from: "it-support@firma-helpdesk.net",
+    subject: "DRINGEND: Ihr Passwort läuft in 2 Stunden ab",
+    body: `Sehr geehrte/r Mitarbeiter/in,
+
+unser IT-System hat festgestellt, dass Ihr Unternehmens-Passwort
+in weniger als 2 Stunden abläuft.
+
+Um einen Datenverlust und Systemausschluss zu vermeiden, 
+klicken Sie JETZT auf den folgenden Link und vergeben
+Sie ein neues Passwort:
+
+>> https://firma-helpdesk.net/reset?token=xK9z21
+
+Bitte geben Sie dabei Ihr AKTUELLES Passwort zur Verifizierung ein.
+
+IT-Support Team`,
+    clues: [
+      { icon: "🔴", text: "Externe Domain 'firma-helpdesk.net' – echte IT-Abteilungen nutzen die interne Unternehmens-Domain" },
+      { icon: "🔴", text: "Nach aktuellem Passwort wird gefragt – legitime Passwort-Resets benötigen das alte Passwort NICHT" },
+      { icon: "🔴", text: "Extremer Zeitdruck ('2 Stunden') soll rationales Denken verhindern" },
+      { icon: "🟡", text: "Generische Anrede ('Sehr geehrte/r Mitarbeiter/in') – echter IT-Support kennt deinen Namen" }
+    ]
+  },
+  {
+    isPhishing: false,
+    from: "rechnung@amazon.de",
+    subject: "Deine Bestellung #305-7492810 wurde versandt",
+    body: `Hallo Max,
+
+deine Bestellung ist unterwegs! Hier deine Versanddetails:
+
+Bestellnummer: #305-7492810
+Artikel: Sony WH-1000XM5 Kopfhörer (1x)
+Versanddienstleister: DHL
+Voraussichtliche Lieferung: 21.02.2026
+
+Du kannst deine Bestellung unter amazon.de/orders verfolgen.
+Melde dich dort mit deinen üblichen Amazon-Zugangsdaten an.
+
+Danke für deinen Einkauf!
+Amazon.de Kundenservice`,
+    clues: [
+      { icon: "🟢", text: "Offizielle Domain '@amazon.de' – passt zur deutschen Amazon-Plattform" },
+      { icon: "🟢", text: "Persönliche Anrede mit echtem Namen" },
+      { icon: "🟢", text: "Konkrete Bestelldetails (Nummer, Artikel) – Phishing-Mails sind meist vage" },
+      { icon: "🟢", text: "Kein direkter Login-Link in der Mail – Verweis auf amazon.de ohne Weiterleitungen" }
+    ]
+  },
+  {
+    isPhishing: true,
+    from: "noreply@dhl-paket-service.info",
+    subject: "Paket konnte nicht zugestellt werden – Gebühr erforderlich",
+    body: `Sehr geehrter Empfänger,
+
+Ihr Paket mit der Sendungsnummer DE4923847201 konnte nicht 
+zugestellt werden, da eine Zollgebühr von 2,99 € aussteht.
+
+Um die Zustellung zu veranlassen, zahlen Sie bitte die 
+Gebühr über folgenden Link:
+
+→ https://dhl-paket-service.info/zahlung/DE4923847201
+
+Zahlung muss innerhalb von 48 Stunden erfolgen, 
+sonst wird das Paket zurückgeschickt.
+
+DHL Paketzustellung`,
+    clues: [
+      { icon: "🔴", text: "Domain 'dhl-paket-service.info' – DHL nutzt ausschließlich '@dhl.de' oder '@dhl.com'" },
+      { icon: "🔴", text: "Kleine Gebühr (2,99 €) senkt die Hemmschwelle – klassische Smishing/Phishing-Taktik" },
+      { icon: "🔴", text: "Zeitdruck mit Androhung der Rücksendung" },
+      { icon: "🟡", text: "Zollgebühren unter 150 € werden bei Paketen aus EU-Ländern nicht erhoben" }
+    ]
+  },
+  {
+    isPhishing: false,
+    from: "no-reply@apple.com",
+    subject: "Deine Apple ID wurde auf einem neuen Gerät genutzt",
+    body: `Hallo,
+
+deine Apple ID wurde verwendet, um sich auf einem iPhone 15 Pro 
+in München, Deutschland anzumelden.
+
+Datum: 20. Februar 2026, 14:32 Uhr
+Gerät: iPhone 15 Pro
+Ort: München, Deutschland
+
+Wenn du dies warst, musst du nichts weiter tun.
+
+Wenn du diese Anmeldung nicht erkennst, überprüfe bitte 
+deine Kontoaktivität unter appleid.apple.com
+
+Apple Support`,
+    clues: [
+      { icon: "🟢", text: "Offizielle Domain '@apple.com' – korrekt und verifizierbar" },
+      { icon: "🟢", text: "Kein Druck, kein Aufruf zur sofortigen Aktion – nur eine Benachrichtigung" },
+      { icon: "🟢", text: "Verweis auf 'appleid.apple.com' – offizielle Apple-Domain, kein verdächtiger Link" },
+      { icon: "🟢", text: "Konkrete Angaben zu Gerät, Ort und Zeit – erhöht Glaubwürdigkeit" }
+    ]
+  },
+  {
+    isPhishing: true,
+    from: "gewinne@lotto-de-gewinn.com",
+    subject: "🎉 Herzlichen Glückwunsch! Sie haben 45.000 € gewonnen!",
+    body: `HERZLICHEN GLÜCKWUNSCH!!!
+
+Sie wurden als GEWINNER unserer exklusiven Online-Lotterie 
+ausgewählt und haben einen Hauptpreis von 45.000 € gewonnen!
+
+Um Ihren Gewinn zu erhalten, senden Sie uns bitte:
+• Vollständiger Name
+• Adresse  
+• Kopie Ihres Personalausweises
+• Ihre Bankverbindung (IBAN)
+
+Bitte antworten Sie INNERHALB VON 72 STUNDEN an:
+auszahlung@lotto-claim.net
+
+Ihr Gewinn verfällt nach dieser Frist automatisch!
+
+Herzlichst,
+Dr. Klaus Müller
+Gewinnabwicklung International`,
+    clues: [
+      { icon: "🔴", text: "Man kann keine Lotterie gewinnen, an der man nicht teilgenommen hat" },
+      { icon: "🔴", text: "Abfrage hochsensibler Daten: Ausweis + Bankdaten per E-Mail = Identitätsdiebstahl" },
+      { icon: "🔴", text: "Zwei verschiedene Domains (absender vs. antwort-an) – typisch für Betrug" },
+      { icon: "🔴", text: "Übertriebene Begeisterung (!!!, Großbuchstaben) und Zeitdruck" }
+    ]
+  },
+  {
+    isPhishing: false,
+    from: "info@sparkasse.de",
+    subject: "Ihre monatliche Kontoübersicht – Januar 2026",
+    body: `Sehr geehrter Herr Mustermann,
+
+Ihre Kontoübersicht für Januar 2026 steht bereit.
+
+Kontonummer: DE89 ***** ***** 3420
+Zeitraum: 01.01.2026 – 31.01.2026
+Kontostand: 2.847,33 €
+
+Die vollständige Übersicht können Sie im Online-Banking 
+unter sparkasse.de einsehen. Loggen Sie sich wie gewohnt 
+mit Ihrer Sparkassen-ID ein.
+
+Bei Fragen steht Ihnen Ihr Berater Herr Thomas Braun 
+(thomas.braun@sparkasse-muenchen.de) gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+Ihre Sparkasse München`,
+    clues: [
+      { icon: "🟢", text: "Offizielle Domain '@sparkasse.de' – verifizierbar" },
+      { icon: "🟢", text: "Kein Klick-Link, kein Login-Button – Aufforderung zur manuellen Eingabe der URL" },
+      { icon: "🟢", text: "Persönliche Anrede, konkreter Kontaktpartner mit Name und E-Mail" },
+      { icon: "🟢", text: "Kontonummer nur teilweise sichtbar (maskiert) – Datenschutz wird beachtet" }
+    ]
+  }
+];
+
+// spielzustand, wird bei jedem neustart zurückgesetzt (Das auf Notiz noch umsetzen)
+let spielstand = {
+  spielerName: '',
+  punkte: 0,
+  aktuelleRunde: 0,
+  richtig: 0,         // wie oft richtig getippt
+  falsch: 0,          // wie oft daneben
+  zeitProRunde: [],   // für den durchschnitt am ende
+  timerSekunden: 30,
+  timerInterval: null,
+  rundenStart: null,  // timestamp wenn die mail erscheint
+  mailReihenfolge: []
+};
+
+// bestenliste aus localstorage lesen
+
+function bestenliste_laden() {
+  // gibt leeres array zurück falls noch nichts gespeichert
+  try { return JSON.parse(localStorage.getItem('phishguard_lb') || '[]'); }
+  catch { return []; }
+}
+// neuen eintrag speichern, liste sortieren und auf 10 begrenzen 
+function bestenliste_speichern(eintrag) {
+  let liste = bestenliste_laden();
+  liste.push(eintrag);
+  liste.sort((a, b) => b.punkte - a.punkte);
+  liste = liste.slice(0, 10); // max 10 einträge
+  localStorage.setItem('phishguard_lb', JSON.stringify(liste));
+}
+//  top 5 einträge in den angegebenen container rendern 
+function bestenliste_anzeigen(containerId) {
+  const liste = bestenliste_laden();
+  const el = document.getElementById(containerId);
+  if (!liste.length) {
+    el.innerHTML = '<div class="lb-row" style="color:var(--muted);font-size:0.8rem">Noch keine Einträge</div>';
+    return;
+  }
+  // nur top 5 anzeigen, rest wird gespeichert aber nicht gezeigt
+  el.innerHTML = liste.slice(0, 5).map((e, i) => `
+    <div class="lb-row">
+      <span class="lb-rank">#${i+1}</span>
+      <span class="lb-name">${e.name}</span>
+      <span class="lb-score">${e.punkte} Pts</span>
+    </div>`).join('');
+}
+
+// Navigation
+
+function bildschirmWechseln(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// eingabe prüfen, spielstand zurücksetzen, spiel beginnen 
+
+function spielStarten() {
+  const name = document.getElementById('player-name').value.trim();
+  if (!name) { document.getElementById('player-name').focus(); return; }
+
+  // alles zurücksetzen und mails neu mischen
+  spielstand = {
+    spielerName: name,
+    punkte: 0,
+    aktuelleRunde: 0,
+    richtig: 0,
+    falsch: 0,
+    zeitProRunde: [],
+    timerSekunden: 30,
+    timerInterval: null,
+    rundenStart: null,
+    mailReihenfolge: mischen([...MAILS]) // mails neu mischen damit reihenfolge nicht gleich bleibt
+  };
+
+  bildschirmWechseln('game-screen');
+  mailAnzeigen();
+}
+
+// fisher-yates, reihenfolge durchmischen damit man nicht auswendiglernen kann
+function mischen(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// aktuelle mail ins dom schreiben und timer starten 
+
+function mailAnzeigen() {
+  const aktMail = spielstand.mailReihenfolge[spielstand.aktuelleRunde];
+
+  // mail-inhalt ins DOM schreiben
+  document.getElementById('mail-from').textContent = aktMail.from;
+  document.getElementById('mail-subject').textContent = aktMail.subject;
+  document.getElementById('mail-body').textContent = aktMail.body;
+  document.getElementById('hud-progress').textContent = `${spielstand.aktuelleRunde + 1} / ${spielstand.mailReihenfolge.length}`;
+  document.getElementById('hud-score').textContent = spielstand.punkte;
+  document.getElementById('hud-correct').textContent = spielstand.richtig;
+
+  timerStarten();
+}
+// timer starten und bei 0 automatisch als falsch werten 
+function timerStarten() {
+  clearInterval(spielstand.timerInterval); // alten timer stoppen falls noch läuft
+  spielstand.timerSekunden = 30;
+  spielstand.rundenStart = Date.now();
+  timerAnzeigenAktualisieren();
+
+  spielstand.timerInterval = setInterval(() => {
+    spielstand.timerSekunden--;
+    timerAnzeigenAktualisieren();
+    if (spielstand.timerSekunden <= 0) {
+      clearInterval(spielstand.timerInterval);
+      antworten(null); // null = zeit abgelaufen, zählt als falsch
+    }
+  }, 1000);
+}
+// timer im hud aktualisieren und balkenfarbe anpassen 
+function timerAnzeigenAktualisieren() {
+  document.getElementById('hud-timer').textContent = spielstand.timerSekunden;
+  const prozent = (spielstand.timerSekunden / 30) * 100;
+  const balken = document.getElementById('timer-bar');
+  balken.style.width = prozent + '%';
+  // farbe ändert sich je nach verbleibender zeit
+  balken.style.background = prozent > 60 ? 'var(--safe)' : prozent > 30 ? 'var(--warn)' : 'var(--danger)';
+}
+// spielerantwort auswerten, punkte vergeben, feedback zeigen 
+function antworten(istPhishing) {
+  clearInterval(spielstand.timerInterval);
+
+  const vergangeneZeit = Math.round((Date.now() - spielstand.rundenStart) / 1000);
+  spielstand.zeitProRunde.push(Math.min(vergangeneZeit, 30));
+
+  const aktMail = spielstand.mailReihenfolge[spielstand.aktuelleRunde];
+  const korrekt = istPhishing === aktMail.isPhishing;
+  const zeitAbgelaufen = istPhishing === null;
+
+  // 100 basispunkte + bis zu 90 bonuspunkte für schnelle antwort
+  let gewonnePunkte = 0;
+  if (korrekt) {
+    gewonnePunkte = 100 + Math.max(0, (30 - vergangeneZeit) * 3);
+    spielstand.punkte += gewonnePunkte;
+    spielstand.richtig++;
+  } else {
+    spielstand.falsch++;
+  }
+
+  feedbackAnzeigen(korrekt, zeitAbgelaufen, gewonnePunkte, aktMail);
+}
+
+// feedback overlay mit ergebnis, punkten und hinweisenn befüllen (noch prüfen, ob man besser machen kann)
+
+function feedbackAnzeigen(korrekt, zeitAbgelaufen, gewonnePunkte, mail) {
+  const kopfzeile = document.getElementById('fb-header');
+  const symbol    = document.getElementById('fb-icon');
+  const titel     = document.getElementById('fb-title');
+  const punkteEl  = document.getElementById('fb-pts');
+  const hinweise  = document.getElementById('fb-clues');
+
+  // farbe und text je nach ergebnis
+  kopfzeile.className = 'feedback-header ' + (korrekt ? 'correct' : 'wrong');
+  symbol.textContent  = korrekt ? '✅' : (zeitAbgelaufen ? '⏱️' : '❌');
+  titel.className     = 'feedback-title ' + (korrekt ? 'correct' : 'wrong');
+  titel.textContent   = zeitAbgelaufen ? 'Zeit abgelaufen!' : korrekt ? 'Richtig erkannt!' : 'Falsch geraten!';
+  punkteEl.textContent = korrekt ? `+${gewonnePunkte} Pts` : '';
+
+  // hinweise aus dem mail-objekt rendern
+  hinweise.innerHTML = mail.clues.map(h =>
+    `<li class="clue-item"><span class="clue-icon">${h.icon}</span><span>${h.text}</span></li>`
+  ).join('');
+
+  document.getElementById('feedback-overlay').classList.add('active');
+}
+//  feedback schließen und zur nächsten runde oder auswertung 
+function naechsteMail() {
+  document.getElementById('feedback-overlay').classList.remove('active');
+  spielstand.aktuelleRunde++;
+
+  if (spielstand.aktuelleRunde >= spielstand.mailReihenfolge.length) {
+    spielEnde();
+  } else {
+    mailAnzeigen();
+  }
+}
+
+// statistiken berechnen, in bestenliste speichern, auswertung zeigen
+
+function spielEnde() {
+  const zeiten = spielstand.zeitProRunde;
+  const durchschnitt = zeiten.length ? Math.round(zeiten.reduce((a, b) => a + b, 0) / zeiten.length) : 0; // durchschnitt aus allen rundenzeiten
+
+  bestenliste_speichern({ name: spielstand.spielerName, punkte: spielstand.punkte });
+
+  document.getElementById('end-score').textContent = spielstand.punkte;
+  document.getElementById('stat-correct').textContent = spielstand.richtig;
+  document.getElementById('stat-wrong').textContent = spielstand.falsch;
+  document.getElementById('stat-time').textContent = durchschnitt + 's';
+
+  // bewertungstext abhängig von trefferquote
+  const quote = spielstand.richtig / spielstand.mailReihenfolge.length;
+  const bewertung = quote >= 0.875 ? '🏆 Phishing-Experte!' : quote >= 0.625 ? '👍 Gut aufgepasst' : quote >= 0.375 ? '⚠️ Noch Luft nach oben' : '❌ Vorsicht – übe weiter!';
+  document.getElementById('end-grade').textContent = bewertung;
+
+  bestenliste_anzeigen('lb-end');
+  bildschirmWechseln('end-screen');
+}
+//  zurück zur startseite, bestenliste neu laden 
+function neuStarten() {
+  bestenliste_anzeigen('lb-start');
+  bildschirmWechseln('start-screen');
+}
+
+// beim laden bestenliste direkt befüllen
+bestenliste_anzeigen('lb-start');
+
+// enter taste zum starten
+document.getElementById('player-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') spielStarten();
+});
+</script>
+</body>
+</html>
